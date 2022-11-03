@@ -1,4 +1,5 @@
 import numpy as np
+import pandas as pd
 from scipy import stats
 from sklearn.metrics import log_loss
 from sklearn.tree import DecisionTreeClassifier
@@ -77,6 +78,7 @@ def D3_pruning(X_train, y_train):
     
     return tree_grid
 
+
 def build_MLP(X_train, y_train_cat, features):
     """
     Parameters
@@ -106,3 +108,44 @@ def build_MLP(X_train, y_train_cat, features):
     
     return model
     
+    
+def data_to_feather(data_dir):
+    """
+    Parameters
+    ----------
+
+    data_dir: str. directory in which data is located
+    
+    Returns
+    -------
+
+    None
+    But a feather file with the same name is written in 'data_dir'
+    """
+    
+    if ".xlsx" in data_dir:
+        data_import = pd.read_excel(data_dir)
+    else:
+        data_import = pd.read_csv(data_dir)
+
+    if data_import.shape[1] == 1:
+        df = pd.DataFrame([list(data_import.applymap(lambda s: s.split(";")).values)[i][0]
+                           for i in range(len(data_import))])
+        df.columns = [new_c.strip() for new_c in
+                      data_import.columns[0].split(";")]
+
+        for c in df.columns:
+            try:
+                df[c] = df[c].astype(int)
+            except:
+                continue
+
+    else:
+        df = data_import.copy()
+        
+    filename = data_dir.split("\\")[-1].split(".")[0]
+    
+    
+    df.to_feather("{}\\{}.feather".format("\\".join(data_dir.split("\\")[:-1]), filename))
+    
+    return None
