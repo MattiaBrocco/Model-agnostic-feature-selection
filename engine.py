@@ -14,6 +14,7 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import train_test_split
 from sklearn.inspection import permutation_importance
 from sklearn.linear_model import LogisticRegressionCV
+from sklearn.ensemble import GradientBoostingClassifier
 
 from tensorflow.keras.utils import to_categorical
 
@@ -102,8 +103,10 @@ class Classification:
         
         # 1.1 Pruning        
         pruned_tree = support.D3_pruning(X_train, y_train)
-        random_forest = RandomForestClassifier(n_jobs = -1, random_state = 42,
-                                               ccp_alpha = pruned_tree.best_params_["ccp_alpha"])
+        # !!!!!!
+        random_forest = GradientBoostingClassifier(#n_jobs = -1,
+                                                   random_state = 42,
+                                                   ccp_alpha = pruned_tree.best_params_["ccp_alpha"])
         random_forest.fit(X_train, y_train)
         
         # 1.3 Feature selection
@@ -117,10 +120,10 @@ class Classification:
                 
                 selected_features += [i]
         
-        if len(selected_features) == 0:
+        if len(selected_features) < 2:
             selected_features = np.where(np.abs(perm_imp.importances_mean) > 1e-2)[0]
             selected_features = selected_features.tolist()
-            if len(selected_features) == 0:
+            if len(selected_features) < 2:
                 selected_features = np.where(perm_imp.importances_mean != 0)[0]
                 selected_features = selected_features.tolist()
             #if len(selected_features) == 1:
@@ -166,6 +169,7 @@ class Classification:
             print("Warning: likelihood ratio test H0 should be rejected")
             
         return {"Features": selected_features,
+                "Wilks test p-value": np.round(validation_test[1], 7),
                 "Validation passed": valid_output}
     
     def benchmark_models(self, X_train, X_test, y_train, y_test, features):
@@ -181,6 +185,10 @@ class Classification:
         self.X_train = X_train
         self.y_train = y_train
         self.features = features
+        
+        # Full Logit
+        model0 = LogisticRegression(random_state = 101)
+        model0.fit(X_train, y_train)
         
         # Logistic regression
         model1 = LogisticRegression(random_state = 101)
@@ -205,9 +213,9 @@ class Classification:
         
         model4 = support.build_MLP(X_train, y_train_cat, features)
         
-        
         # SCORES
-        out = pd.Series( [accuracy_score(y_test,
+        out = pd.Series( [accuracy_score(y_test, model0.predict(X_test)),
+                          accuracy_score(y_test,
                                          fitted_models[0].predict(X_test[:, features["Features"]])),
                           accuracy_score(y_test,
                                          fitted_models[1].predict(X_test[:, features["Features"]])),
@@ -216,8 +224,11 @@ class Classification:
                           accuracy_score(y_test,
                                          pd.DataFrame(model4.predict(X_test[:, features["Features"]]))\
                                          .idxmax(axis = 1).values )],
-                        index = ["Logistic Regression", "SVC",
+                        index = ["Full Logit", "Logistic Regression", "SVC",
                                  "Random Forest", "Neural Network"])
+
+        support.scores_table(X_train, X_train[:, features["Features"]])
+        
         return out
         
         

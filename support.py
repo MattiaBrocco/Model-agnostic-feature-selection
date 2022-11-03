@@ -36,8 +36,9 @@ def likelihood_ratio_test(model1, model2, X_train1, X_train2, y_train):
     
     lambda_stat = -2*(ll_model1 - ll_model2)
     
+    # H0: the two models have similar likelihood.
     # The likelihood-ratio test rejects H0
-    # if the value of this statistic is too small
+    # if the value of this statistic is too small.
     
     def_freedom = X_train2.shape[1] - X_train1.shape[1]
     
@@ -51,7 +52,7 @@ def likelihood_ratio_test(model1, model2, X_train1, X_train2, y_train):
     # outcome was nearly as likely to occur under the null hypothesis as
     # the alternative, and so the null hypothesis cannot be rejected.
     
-    p_value = 1 - stats.chi2.cdf(lambda_stat, def_freedom)
+    p_value = np.float64(1 - stats.chi2.cdf(lambda_stat, def_freedom))
     
     return lambda_stat, p_value
     
@@ -77,6 +78,17 @@ def D3_pruning(X_train, y_train):
     tree_grid.fit(X_train, y_train)
     
     return tree_grid
+
+
+def scores_table(X_full, X_reduced):
+    
+    # Sample size
+    # Number of features selected over the total number of features
+    print("Sample size: {}\nSelected {} features out of {}".format(len(X_full),
+                                                                   X_reduced.shape[1],
+                                                                   X_full.shape[1]))
+    
+    
 
 
 def build_MLP(X_train, y_train_cat, features):
