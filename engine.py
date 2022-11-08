@@ -104,8 +104,7 @@ class Classification:
         # 1.1 Pruning        
         pruned_tree = support.D3_pruning(X_train, y_train)
         # !!!!!!
-        random_forest = GradientBoostingClassifier(#n_jobs = -1,
-                                                   random_state = 42,
+        random_forest = GradientBoostingClassifier(random_state = 42,
                                                    ccp_alpha = pruned_tree.best_params_["ccp_alpha"])
         random_forest.fit(X_train, y_train)
         
@@ -126,10 +125,6 @@ class Classification:
             if len(selected_features) < 2:
                 selected_features = np.where(perm_imp.importances_mean != 0)[0]
                 selected_features = selected_features.tolist()
-            #if len(selected_features) == 1:
-            #    selected_features = [selected_features]
-            #elif len(selected_features) > 1:
-            #    selected_features = list(selected_features)
         else:
             pass
                 #print("{} {:.3f} ± {:.3f}".format(X.columns[i],
@@ -156,7 +151,7 @@ class Classification:
                                                         X_train[:,selected_features],
                                                         X_train, y_train) 
         # 2.2 Consider factor loading
-        data_fl = pd.DataFrame(np.c_[X_train[:,selected_features],
+        data_fl = pd.DataFrame(np.c_[X_train[:, selected_features],
                                      y_train]).corr()
         fl = abs(data_fl).min().min()
         

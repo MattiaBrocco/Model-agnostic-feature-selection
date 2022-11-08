@@ -88,9 +88,6 @@ def scores_table(X_full, X_reduced):
                                                                    X_reduced.shape[1],
                                                                    X_full.shape[1]))
     
-    
-
-
 def build_MLP(X_train, y_train_cat, features):
     """
     Parameters
