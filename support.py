@@ -84,9 +84,9 @@ def scores_table(X_full, X_reduced):
     
     # Sample size
     # Number of features selected over the total number of features
-    print("Sample size: {}\nSelected {} features out of {}".format(len(X_full),
-                                                                   X_reduced.shape[1],
-                                                                   X_full.shape[1]))
+    print("Train size: {}\nSelected {} features out of {}".format(len(X_full),
+                                                                  X_reduced.shape[1],
+                                                                  X_full.shape[1]))
     
 def build_MLP(X_train, y_train_cat, features):
     """
@@ -111,7 +111,12 @@ def build_MLP(X_train, y_train_cat, features):
     model.compile(loss = "binary_crossentropy", optimizer = "sgd",
                   metrics = ["accuracy"])
     
-    history = model.fit(X_train[:, features["Features"]], y_train_cat,
+    if isinstance(X_train, pd.DataFrame):
+        small_X_train = X_train.iloc[:, features["Features"]]
+    else:
+        small_X_train = X_train[:, features["Features"]]
+    
+    history = model.fit(small_X_train, y_train_cat,
                         epochs = 500, batch_size = min(len(X_train)/3, 50),
                         verbose = 0, validation_split = 0.3, callbacks = [early_stopping])
     

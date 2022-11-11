@@ -2,14 +2,18 @@ import os
 import sys
 import numpy as np
 import pandas as pd
-import scipy.stats as stats
+
 from sklearn.svm import SVC
 from sklearn.metrics import accuracy_score
-from sklearn.preprocessing import StandardScaler
+from sklearn.preprocessing import MinMaxScaler
 from sklearn.tree import DecisionTreeClassifier
+from sklearn.model_selection import GridSearchCV
+from sklearn.metrics import classification_report
 from sklearn.linear_model import LogisticRegression
+from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import train_test_split
 from sklearn.inspection import permutation_importance
+from sklearn.linear_model import LogisticRegressionCV
 from sklearn.ensemble import GradientBoostingClassifier
 
 from tensorflow.keras.utils import to_categorical
@@ -57,7 +61,6 @@ class Classification:
                     df[c] = df[c].astype(int)
                 except:
                     continue
-
         else:
             df = data_import.copy()
         
@@ -69,7 +72,7 @@ class Classification:
         X_train, X_test, y_train, y_test = train_test_split(X, y, train_size = .7,
                                                             random_state = 42, shuffle = True)
         # Scale data
-        scaler = StandardScaler()
+        scaler = MinMaxScaler()
         scaler.fit(X_train)
         
         X_train = scaler.transform(X_train)
@@ -93,6 +96,24 @@ class Classification:
         self.X_train = X_train
         self.y_train = y_train
         
+        # STEP 1: PCA. Find the minimum number of components
+        #         that retains 60% of the variance. Then apply
+        #         this type of dimensionality reduction.
+        pca = PCA(n_components = None, random_state = 42)
+        pca.fit(X_train)
+
+        cum_exp_var = pca.explained_variance_ratio_.cumsum()
+        
+        pca2 = PCA(n_components = len(cum_exp_var[cum_exp_var <= .6]),
+                   random_state = 42)
+        pca2.fit(X_train)
+        
+        new_X_train = pca2.transform(X_train)
+        
+        raise ValueError
+        
+        
+        
         # STEP 1: Permutation importance with a random forest.
         #         The forest inherits the complexity of a post-pruned tree.
         #         The tree is subjected to post-pruning (with CV)
@@ -105,39 +126,27 @@ class Classification:
         random_forest.fit(X_train, y_train)
         
         # 1.3 Feature selection
-        perm_imp = permutation_importance(random_forest, X_test, y_test, n_repeats = 50,
+        perm_imp = permutation_importance(random_forest, X_test, y_test, n_repeats = 30,
                                           random_state = 42, scoring = "accuracy",
                                           n_jobs = -1)
         
-        selected_features = pd.DataFrame(perm_imp["importances"].T)\
-                            .apply(lambda col: 1 if
-                                   stats.ttest_1samp(col, popmean = 0,
-                                                     alternative = "greater")[1] < 0.001
-                                   else 0)
-        selected_features = np.where(selected_features != 0)[0].tolist()
+        selected_features = []        
+        for i in perm_imp.importances_mean.argsort()[::-1]:
+            if perm_imp.importances_mean[i] - 2 * perm_imp.importances_std[i] > 0:
+                
+                selected_features += [i]
         
-        if isinstance(X_train, pd.DataFrame):
-            small_X_train = X_train.iloc[:,selected_features]
+        if len(selected_features) < 2:
+            selected_features = np.where(np.abs(perm_imp.importances_mean) > 1e-2)[0]
+            selected_features = selected_features.tolist()
+            if len(selected_features) < 2:
+                selected_features = np.where(perm_imp.importances_mean != 0)[0]
+                selected_features = selected_features.tolist()
         else:
-            small_X_train = X_train[:,selected_features]
-        
-        #selected_features = []        
-        #for i in perm_imp.importances_mean.argsort()[::-1]:
-        #    if perm_imp.importances_mean[i] - 2 * perm_imp.importances_std[i] > 0:
-        #        
-        #        selected_features += [i]
-        
-        #if len(selected_features) < 2:
-        #    selected_features = np.where(np.abs(perm_imp.importances_mean) > 1e-2)[0]
-        #    selected_features = selected_features.tolist()
-        #    if len(selected_features) < 2:
-        #        selected_features = np.where(perm_imp.importances_mean != 0)[0]
-        #        selected_features = selected_features.tolist()
-        #else:
-        #    pass
-        #        #print("{} {:.3f} ± {:.3f}".format(X.columns[i],
-        #        #                                  r2.importances_mean[i],
-        #        #                                  r2.importances_std[i]))
+            pass
+                #print("{} {:.3f} ± {:.3f}".format(X.columns[i],
+                #                                  r2.importances_mean[i],
+                #                                  r2.importances_std[i]))
                 
         # STEP 2: Validation of feature selection. This is made
         #         By running a (generalized) linear model with
@@ -147,7 +156,7 @@ class Classification:
         ######logreg_red = LogisticRegressionCV(Cs = 50, penalty = "l1", random_state = 42,
         ######                                  n_jobs = -1, solver = "saga", max_iter = 5e3)        
         logreg_red = LogisticRegression(n_jobs = -1, random_state = 42, max_iter = 5e3)
-        logreg_red.fit(small_X_train, y_train)
+        logreg_red.fit(X_train[:,selected_features], y_train)
         
         ######logreg_full = LogisticRegressionCV(Cs = 50, penalty = "l1", random_state = 42,
         ######                                   n_jobs = -1, solver = "saga", max_iter = 5e3)
@@ -156,23 +165,24 @@ class Classification:
         
         # 2.1 Run test
         validation_test = support.likelihood_ratio_test(logreg_red, logreg_full,
-                                                        small_X_train,
+                                                        X_train[:,selected_features],
                                                         X_train, y_train) 
         # 2.2 Consider factor loading
-        data_fl = pd.DataFrame(np.c_[small_X_train, y_train]).corr()
-        fl = np.abs(data_fl)[len(selected_features)].min()
+        data_fl = pd.DataFrame(np.c_[X_train[:, selected_features],
+                                     y_train]).corr()
+        fl = abs(data_fl).min().min()
         
+        valid_output = False
         # validation_test[1]: p-value of likelihood ratio test
-        valid_lrt = True if validation_test[1] > 0.05 else False
-        # Correlations
-        valid_corr = True if fl >= 0.7 else False
-        
-        if valid_lrt is False:
+        if validation_test[1] > 0.05:
+            if fl >= 0.7:
+                valid_output = True
+        else:
             print("Warning: likelihood ratio test H0 should be rejected")
             
         return {"Features": selected_features,
                 "Wilks test p-value": np.round(validation_test[1], 7),
-                "High correlation": valid_corr}
+                "Validation passed": valid_output}
     
     def benchmark_models(self, X_train, X_test, y_train, y_test, features):
         """
@@ -188,23 +198,12 @@ class Classification:
         self.y_train = y_train
         self.features = features
         
-        if isinstance(X_train, pd.DataFrame):
-            small_X_train = X_train.iloc[:, features["Features"]]
-        else:
-            small_X_train = X_train[:, features["Features"]]
-            
-        if isinstance(X_test, pd.DataFrame):
-            small_X_test = X_test.iloc[:, features["Features"]]
-        else:
-            small_X_test = X_test[:, features["Features"]]
-        
-        
         # Full Logit
-        model0 = LogisticRegression(random_state = 42, n_jobs = -1)
+        model0 = LogisticRegression(random_state = 101)
         model0.fit(X_train, y_train)
         
         # Logistic regression
-        model1 = LogisticRegression(random_state = 42, n_jobs = -1)
+        model1 = LogisticRegression(random_state = 101)
         #model1.fit(X_train[:, features["Features"]], y_train)
         
         # Support vector machine
@@ -212,15 +211,12 @@ class Classification:
         #model2.fit(X_train[:, features["Features"]], y_train)
         
         # Random forest
-        model3 = GradientBoostingClassifier(random_state = 42,
-                                            min_samples_leaf = np.max([5,
-                                                                       len(X_train)/100]).astype(int))
+        model3 = RandomForestClassifier(random_state = 101,
+                                        max_depth = len(X_train)/2)
         #model3.fit(X_train[:, features["Features"]], y_train)
         
-        
-        
-        fitted_models = Parallel(n_jobs = 8)(delayed(lambda m:
-                                                     m.fit(small_X_train, y_train))(model)
+        fitted_models = Parallel(n_jobs = 8)(delayed(lambda m: m.fit(X_train[:, features["Features"]],
+                                                                     y_train))(model)
                                              for model in [model1, model2, model3])
         
         # Neural network
@@ -232,18 +228,18 @@ class Classification:
         # SCORES
         out = pd.Series( [accuracy_score(y_test, model0.predict(X_test)),
                           accuracy_score(y_test,
-                                         fitted_models[0].predict(small_X_test)),
+                                         fitted_models[0].predict(X_test[:, features["Features"]])),
                           accuracy_score(y_test,
-                                         fitted_models[1].predict(small_X_test)),
+                                         fitted_models[1].predict(X_test[:, features["Features"]])),
                           accuracy_score(y_test,
-                                         fitted_models[2].predict(small_X_test)),
+                                         fitted_models[2].predict(X_test[:, features["Features"]])),
                           accuracy_score(y_test,
-                                         pd.DataFrame(model4.predict(small_X_test))\
+                                         pd.DataFrame(model4.predict(X_test[:, features["Features"]]))\
                                          .idxmax(axis = 1).values )],
                         index = ["Full Logit", "Logistic Regression", "SVC",
                                  "Random Forest", "Neural Network"])
 
-        support.scores_table(X_train, small_X_train)
+        support.scores_table(X_train, X_train[:, features["Features"]])
         
         return out
         
