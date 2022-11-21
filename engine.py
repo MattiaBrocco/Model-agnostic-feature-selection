@@ -43,6 +43,8 @@ class Classification:
             data_import = pd.read_excel(data_dir)
         elif ".feather" in data_dir:
             data_import = pd.read_feather(data_dir)
+        elif ".parquet" in data_dir:
+            data_import = pd.read_parquet(data_dir)
         else:
             data_import = pd.read_csv(data_dir)
 
