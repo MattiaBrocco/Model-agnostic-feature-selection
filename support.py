@@ -4,6 +4,7 @@ from scipy import stats
 from sklearn.metrics import log_loss
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.model_selection import GridSearchCV
+from sklearn.linear_model import LogisticRegressionCV
 
 from tensorflow.keras.layers import Dense
 from tensorflow.keras.layers import Input
@@ -121,6 +122,51 @@ def build_MLP(X_train, y_train_cat, features):
                         verbose = 0, validation_split = 0.3, callbacks = [early_stopping])
     
     return model
+    
+
+
+def lasso_benchmark(diz):
+    
+    benchmark = []
+    for k, v in diz.items():
+        
+        if isinstance(v[0], pd.DataFrame):
+            small_X_train = v[0].iloc[:, v[-2]["Features"]]
+        else:
+            small_X_train = v[0][:, v[-2]["Features"]]
+            
+        if isinstance(v[1], pd.DataFrame):
+            small_X_test = v[1].iloc[:, v[-2]["Features"]]
+        else:
+            small_X_test = v[1][:, v[-2]["Features"]]
+        
+        logreg = LogisticRegressionCV(Cs = 1/np.linspace(.1, 100, 300),
+                                      penalty = "l1", n_jobs = -1,
+                                      random_state = 42, solver = "saga",
+                                      cv = 5, max_iter = 5e3, scoring = "accuracy")
+        logreg.fit(small_X_train, v[2])
+
+        mean_cv_scores = logreg.scores_[1].mean(axis = 0)
+
+        # Lambda min (LogisticRegressionCV uses inverse of lambda)
+        lambda_min = logreg.Cs_[np.argmax(mean_cv_scores)]
+
+        # Lambda 1SE (LogisticRegressionCV uses inverse of lambda)
+        one_se_min = np.max(mean_cv_scores) - (np.std(mean_cv_scores)/\
+                                               np.sqrt(len(mean_cv_scores)))
+
+        lambda_1se = logreg.Cs_[np.argmax(mean_cv_scores[mean_cv_scores <= one_se_min])]
+
+        # Number of coefficients excluded at best lambda
+        zero_coefs = np.sum(logreg.coef_ == 0)
+
+        # Difference in accuracy
+        benchmarked_best = v[-1]["Logistic Regression"]
+        logreg_acc = logreg.score(small_X_test, v[3])
+
+        benchmark += [[k, logreg, np.round(1/lambda_min, 3), np.round(1/lambda_1se, 3),
+                       zero_coefs, np.round(logreg_acc-benchmarked_best, 3)]]
+    return benchmark
     
     
 def data_to_feather(data_dir):

@@ -47,7 +47,7 @@ class Classification:
             data_import = pd.read_parquet(data_dir)
         else:
             data_import = pd.read_csv(data_dir)
-
+        
         if data_import.shape[1] == 1:
             df = pd.DataFrame([list(data_import.applymap(lambda s: s.split(";")).values)[i][0]
                                for i in range(len(data_import))])
@@ -59,24 +59,24 @@ class Classification:
                     df[c] = df[c].astype(int)
                 except:
                     continue
-
         else:
             df = data_import.copy()
         
         # Perform train-test split
         X = df.drop(target, axis = 1)
         y = df[target]
-        y = y.apply(lambda v: 1 if v == y.unique()[0] else 0) 
+        y = y.apply(lambda v: 1 if v == "HONEST" or v == "H" else 0)
         
         X_train, X_test, y_train, y_test = train_test_split(X, y, train_size = .7,
                                                             random_state = 42, shuffle = True)
+        
         # Scale data
         scaler = StandardScaler()
         scaler.fit(X_train)
         
         X_train = scaler.transform(X_train)
         X_test = scaler.transform(X_test)
-         
+        
         return X_train, X_test, y_train, y_test
     
     
@@ -123,37 +123,13 @@ class Classification:
         else:
             small_X_train = X_train[:,selected_features]
         
-        #selected_features = []        
-        #for i in perm_imp.importances_mean.argsort()[::-1]:
-        #    if perm_imp.importances_mean[i] - 2 * perm_imp.importances_std[i] > 0:
-        #        
-        #        selected_features += [i]
-        
-        #if len(selected_features) < 2:
-        #    selected_features = np.where(np.abs(perm_imp.importances_mean) > 1e-2)[0]
-        #    selected_features = selected_features.tolist()
-        #    if len(selected_features) < 2:
-        #        selected_features = np.where(perm_imp.importances_mean != 0)[0]
-        #        selected_features = selected_features.tolist()
-        #else:
-        #    pass
-        #        #print("{} {:.3f} ± {:.3f}".format(X.columns[i],
-        #        #                                  r2.importances_mean[i],
-        #        #                                  r2.importances_std[i]))
-                
-        # STEP 2: Validation of feature selection. This is made
-        #         By running a (generalized) linear model with
-        #         all the features and the selected features.
-        #         Then with a statistical test, if the full model
-        #         is no better than the restricted model the validation is done.
-        ######logreg_red = LogisticRegressionCV(Cs = 50, penalty = "l1", random_state = 42,
-        ######                                  n_jobs = -1, solver = "saga", max_iter = 5e3)        
-        logreg_red = LogisticRegression(n_jobs = -1, random_state = 42, max_iter = 5e3)
+        # 2. Train a full and a reduced Logistic Regression and perform Wilks test
+        logreg_red = LogisticRegression(n_jobs = -1, random_state = 42,
+                                        max_iter = 5e3, solver = "saga")
         logreg_red.fit(small_X_train, y_train)
         
-        ######logreg_full = LogisticRegressionCV(Cs = 50, penalty = "l1", random_state = 42,
-        ######                                   n_jobs = -1, solver = "saga", max_iter = 5e3)
-        logreg_full = LogisticRegression(n_jobs = -1, random_state = 42, max_iter = 5e3)
+        logreg_full = LogisticRegression(n_jobs = -1, random_state = 42,
+                                         max_iter = 5e3, solver = "saga")
         logreg_full.fit(X_train, y_train)
         
         # 2.1 Run test
@@ -200,30 +176,28 @@ class Classification:
         else:
             small_X_test = X_test[:, features["Features"]]
         
-        
         # Full Logit
-        model0 = LogisticRegression(random_state = 42, n_jobs = -1)
+        model0 = LogisticRegression(random_state = 42, n_jobs = -1,
+                                    max_iter = 5e3, solver = "saga")
         model0.fit(X_train, y_train)
-        
         # Logistic regression
-        model1 = LogisticRegression(random_state = 42, n_jobs = -1)
-        #model1.fit(X_train[:, features["Features"]], y_train)
+        model1 = LogisticRegression(random_state = 42, n_jobs = -1,
+                                    max_iter = 5e3, solver = "saga")
+        model1.fit(small_X_train, y_train)
         
         # Support vector machine
-        model2 = SVC()
-        #model2.fit(X_train[:, features["Features"]], y_train)
+        model2 = SVC(random_state = 42)
+        model2.fit(small_X_train, y_train)
         
         # Random forest
         model3 = GradientBoostingClassifier(random_state = 42,
                                             min_samples_leaf = np.max([5,
                                                                        len(X_train)/100]).astype(int))
-        #model3.fit(X_train[:, features["Features"]], y_train)
+        model3.fit(small_X_train, y_train)
         
-        
-        
-        fitted_models = Parallel(n_jobs = 8)(delayed(lambda m:
-                                                     m.fit(small_X_train, y_train))(model)
-                                             for model in [model1, model2, model3])
+        #fitted_models = Parallel(n_jobs = 8)(delayed(lambda m:
+        #                                             m.fit(small_X_train, y_train))(model)
+        #                                     for model in [model1, model2, model3])
         
         # Neural network
         y_train_cat = to_categorical(y_train, 2)
@@ -233,17 +207,27 @@ class Classification:
         
         # SCORES
         out = pd.Series( [accuracy_score(y_test, model0.predict(X_test)),
-                          accuracy_score(y_test,
-                                         fitted_models[0].predict(small_X_test)),
-                          accuracy_score(y_test,
-                                         fitted_models[1].predict(small_X_test)),
-                          accuracy_score(y_test,
-                                         fitted_models[2].predict(small_X_test)),
-                          accuracy_score(y_test,
-                                         pd.DataFrame(model4.predict(small_X_test))\
-                                         .idxmax(axis = 1).values )],
+                          accuracy_score(y_test, model1.predict(small_X_test)),
+                          accuracy_score(y_test, model2.predict(small_X_test)),
+                          accuracy_score(y_test, model3.predict(small_X_test)),
+                          accuracy_score(y_test, pd.DataFrame(model4.predict(small_X_test))\
+                                                 .idxmax(axis = 1).values )],
                         index = ["Full Logit", "Logistic Regression", "SVC",
                                  "Random Forest", "Neural Network"])
+        
+        
+        #out = pd.Series( [accuracy_score(y_test, model0.predict(X_test)),
+        #                  accuracy_score(y_test,
+        #                                 fitted_models[0].predict(small_X_test)),
+        #                  accuracy_score(y_test,
+        #                                 fitted_models[1].predict(small_X_test)),
+        #                  accuracy_score(y_test,
+        #                                 fitted_models[2].predict(small_X_test)),
+        #                  accuracy_score(y_test,
+        #                                 pd.DataFrame(model4.predict(small_X_test))\
+        #                                 .idxmax(axis = 1).values )],
+        #                index = ["Full Logit", "Logistic Regression", "SVC",
+        #                         "Random Forest", "Neural Network"])
 
         support.scores_table(X_train, small_X_train)
         
