@@ -1,9 +1,12 @@
+import shap
+import keras
 import numpy as np
 import pandas as pd
 from scipy import stats
 from sklearn.metrics import log_loss
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.model_selection import GridSearchCV
+from sklearn.inspection import permutation_importance
 from sklearn.linear_model import LogisticRegressionCV
 
 from tensorflow.keras.layers import Dense
@@ -14,7 +17,7 @@ from tensorflow.keras.utils import to_categorical
 from tensorflow.python.framework.random_seed import set_random_seed
 
 
-def likelihood_ratio_test(model1, model2, X_train1, X_train2, y_train):
+def likelihood_ratio_test(model_red, model_full, X_train_red, X_train_full, y_train):
     """
     The likelihood-ratio test assesses the goodness of fit
     of two competing statistical models based on the ratio
@@ -31,17 +34,18 @@ def likelihood_ratio_test(model1, model2, X_train1, X_train2, y_train):
     X_train1: 'pd.DataFrame'. Training set for reduced model.
     X_train2: 'pd.DataFrame'. Training set for full model.
     y_train: 'pd.DataFrame'. Common to model1 and model2.
-    """    
-    ll_model1 = log_loss(y_train, model1.predict(X_train1))
-    ll_model2 = log_loss(y_train, model2.predict(X_train2))
+    """
     
-    lambda_stat = -2*(ll_model1 - ll_model2)
+    ll_model_red = log_loss(y_train, model_red.predict(X_train_red))
+    ll_model_full = log_loss(y_train, model_full.predict(X_train_full))
+    
+    lambda_stat = -2*(ll_model_red - ll_model_full)
     
     # H0: the two models have similar likelihood.
     # The likelihood-ratio test rejects H0
     # if the value of this statistic is too small.
     
-    def_freedom = X_train2.shape[1] - X_train1.shape[1]
+    def_freedom = X_train_full.shape[1] - X_train_red.shape[1]
     
     # The numerator corresponds to the likelihood of an observed outcome under H0.
     # The denominator corresponds to the MAX log-likelihood of an observed outcome,
@@ -53,7 +57,7 @@ def likelihood_ratio_test(model1, model2, X_train1, X_train2, y_train):
     # outcome was nearly as likely to occur under the null hypothesis as
     # the alternative, and so the null hypothesis cannot be rejected.
     
-    p_value = np.float64(1 - stats.chi2.cdf(lambda_stat, def_freedom))
+    p_value = np.float64(stats.chi2.sf(lambda_stat, def_freedom))
     
     return lambda_stat, p_value
     
@@ -79,6 +83,35 @@ def D3_pruning(X_train, y_train):
     tree_grid.fit(X_train, y_train)
     
     return tree_grid
+
+
+def sorted_importance_index(model, X, y, features):
+    """
+    Parameters
+    ----------
+    
+    model : from sklearn or keras
+    X, y : pd.DataFrame / np.array - X is the reduced dataset
+    features : list
+    """
+    if isinstance(model, keras.engine.sequential.Sequential):
+        
+        explainer = shap.KernelExplainer(model, X[:100]) # first 100 rows
+        shaps = explainer.shap_values(X[:100], nsamples = 30)
+
+        abs_avg_shaps = np.abs(shaps[0]).mean(axis = 0) + np.abs(shaps[1]).mean(axis = 0)
+        
+        arr = np.c_[features, abs_avg_shaps]
+    else:
+        imps = permutation_importance(model, X, y, scoring = "accuracy",
+                                     random_state = 42, n_repeats = 30)
+
+        arr = np.c_[features, imps["importances_mean"]]
+
+    
+    out = arr[arr[:, 1].argsort()[::-1]][:, 0]
+    
+    return out.astype(int)[:5]
 
 
 def scores_table(X_full, X_reduced):
@@ -122,51 +155,6 @@ def build_MLP(X_train, y_train_cat, features):
                         verbose = 0, validation_split = 0.3, callbacks = [early_stopping])
     
     return model
-    
-
-
-def lasso_benchmark(diz):
-    
-    benchmark = []
-    for k, v in diz.items():
-        
-        if isinstance(v[0], pd.DataFrame):
-            small_X_train = v[0].iloc[:, v[-2]["Features"]]
-        else:
-            small_X_train = v[0][:, v[-2]["Features"]]
-            
-        if isinstance(v[1], pd.DataFrame):
-            small_X_test = v[1].iloc[:, v[-2]["Features"]]
-        else:
-            small_X_test = v[1][:, v[-2]["Features"]]
-        
-        logreg = LogisticRegressionCV(Cs = 1/np.linspace(.1, 100, 300),
-                                      penalty = "l1", n_jobs = -1,
-                                      random_state = 42, solver = "saga",
-                                      cv = 5, max_iter = 5e3, scoring = "accuracy")
-        logreg.fit(small_X_train, v[2])
-
-        mean_cv_scores = logreg.scores_[1].mean(axis = 0)
-
-        # Lambda min (LogisticRegressionCV uses inverse of lambda)
-        lambda_min = logreg.Cs_[np.argmax(mean_cv_scores)]
-
-        # Lambda 1SE (LogisticRegressionCV uses inverse of lambda)
-        one_se_min = np.max(mean_cv_scores) - (np.std(mean_cv_scores)/\
-                                               np.sqrt(len(mean_cv_scores)))
-
-        lambda_1se = logreg.Cs_[np.argmax(mean_cv_scores[mean_cv_scores <= one_se_min])]
-
-        # Number of coefficients excluded at best lambda
-        zero_coefs = np.sum(logreg.coef_ == 0)
-
-        # Difference in accuracy
-        benchmarked_best = v[-1]["Logistic Regression"]
-        logreg_acc = logreg.score(small_X_test, v[3])
-
-        benchmark += [[k, logreg, np.round(1/lambda_min, 3), np.round(1/lambda_1se, 3),
-                       zero_coefs, np.round(logreg_acc-benchmarked_best, 3)]]
-    return benchmark
     
     
 def data_to_feather(data_dir):

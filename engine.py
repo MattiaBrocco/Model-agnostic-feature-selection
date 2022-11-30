@@ -14,10 +14,12 @@ from sklearn.ensemble import GradientBoostingClassifier
 
 from tensorflow.keras.utils import to_categorical
 
+import multiprocessing
 from joblib import delayed
 from joblib import Parallel
 
 import support
+import evaluation
 
 
 class Classification:
@@ -64,8 +66,8 @@ class Classification:
         
         # Perform train-test split
         X = df.drop(target, axis = 1)
-        y = df[target]
-        y = y.apply(lambda v: 1 if v == "HONEST" or v == "H" else 0)
+        y = df[target].apply(lambda v: 1 if v == "HONEST"
+                             or v == "H" else 0)
         
         X_train, X_test, y_train, y_test = train_test_split(X, y, train_size = .7,
                                                             random_state = 42, shuffle = True)
@@ -95,19 +97,24 @@ class Classification:
         self.X_train = X_train
         self.y_train = y_train
         
+        # STEP 0: CREATE A VALIDATION SET
+        X_train_no_val, X_val, y_train_no_val, y_val = train_test_split(X_train, y_train, train_size = .8,
+                                                                        random_state = 42, shuffle = True)
+        
         # STEP 1: Permutation importance with a random forest.
         #         The forest inherits the complexity of a post-pruned tree.
         #         The tree is subjected to post-pruning (with CV)
         
         # 1.1 Pruning        
-        pruned_tree = support.D3_pruning(X_train, y_train)
+        pruned_tree = support.D3_pruning(X_train_no_val, y_train_no_val)
         # !!!!!!
         random_forest = GradientBoostingClassifier(random_state = 42,
                                                    ccp_alpha = pruned_tree.best_params_["ccp_alpha"])
-        random_forest.fit(X_train, y_train)
+        random_forest.fit(X_train_no_val, y_train_no_val)
         
         # 1.3 Feature selection
-        perm_imp = permutation_importance(random_forest, X_test, y_test, n_repeats = 50,
+        
+        perm_imp = permutation_importance(random_forest, X_val, y_val, n_repeats = 100,
                                           random_state = 42, scoring = "accuracy",
                                           n_jobs = -1)
         
@@ -124,6 +131,7 @@ class Classification:
             small_X_train = X_train[:,selected_features]
         
         # 2. Train a full and a reduced Logistic Regression and perform Wilks test
+        # Rmk: this is done on the whole TRAINING dataset
         logreg_red = LogisticRegression(n_jobs = -1, random_state = 42,
                                         max_iter = 5e3, solver = "saga")
         logreg_red.fit(small_X_train, y_train)
@@ -141,6 +149,7 @@ class Classification:
         fl = np.abs(data_fl)[len(selected_features)].min()
         
         # validation_test[1]: p-value of likelihood ratio test
+        # If p_value > 0, the nested model should be used
         valid_lrt = True if validation_test[1] > 0.05 else False
         # Correlations
         valid_corr = True if fl >= 0.7 else False
@@ -205,15 +214,37 @@ class Classification:
         
         model4 = support.build_MLP(X_train, y_train_cat, features)
         
+        n_cores = min(multiprocessing.cpu_count(), 8) # don't use more than 8 cores
+        
+        
+        #importance_rank = Parallel(n_jobs = n_cores)\
+        #                    (delayed(lambda m:
+        #                             support.sorted_importance_index(m, small_X_train, y_train,
+        #                                                             features["Features"]))(model)
+        #                     for model in [model1, model2, model3, model4])
+        
+        importance_rank = [[np.nan]*len(features["Features"][:5])] +\
+                          [support.sorted_importance_index(m, small_X_train, y_train,
+                                                           features["Features"])
+                           for m in [model1, model2, model3, model4]]
+        
         # SCORES
-        out = pd.Series( [accuracy_score(y_test, model0.predict(X_test)),
+        
+        out = np.c_[[accuracy_score(y_test, model0.predict(X_test)),
                           accuracy_score(y_test, model1.predict(small_X_test)),
                           accuracy_score(y_test, model2.predict(small_X_test)),
                           accuracy_score(y_test, model3.predict(small_X_test)),
                           accuracy_score(y_test, pd.DataFrame(model4.predict(small_X_test))\
-                                                 .idxmax(axis = 1).values )],
-                        index = ["Full Logit", "Logistic Regression", "SVC",
-                                 "Random Forest", "Neural Network"])
+                                                 .idxmax(axis = 1).values )], importance_rank]
+        
+        out = pd.DataFrame(out, index = ["Full Logit", "Logistic Regression", "SVC",
+                                         "Random Forest", "Neural Network"],
+                           columns = ["Accuracy"] + [f"FI {i+1}" for i in
+                                                     range(len(importance_rank[0]))])
+        
+        #out = pd.Series( ,
+        #                index = ["Full Logit", "Logistic Regression", "SVC",
+        #                         "Random Forest", "Neural Network"])
         
         
         #out = pd.Series( [accuracy_score(y_test, model0.predict(X_test)),
@@ -231,7 +262,9 @@ class Classification:
 
         support.scores_table(X_train, small_X_train)
         
-        return out
+        stability = evaluation.stability_metric(out)
+        
+        return out, stability
         
         
         
