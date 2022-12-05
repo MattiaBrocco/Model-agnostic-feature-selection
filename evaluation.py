@@ -35,7 +35,7 @@ def lasso_benchmark(diz):
         
         sel_feats = [i for i in v if isinstance(i, dict)][0]
         acc_data = [i for i in v if isinstance(i, pd.DataFrame)
-                    and "Logistic Regression" in i.index][0]
+                    and "Accuracy" in i.columns][0]
         
         if isinstance(v[0], pd.DataFrame):
             small_X_train = v[0].iloc[:, sel_feats["Features"]]
@@ -66,9 +66,9 @@ def lasso_benchmark(diz):
 
         # Number of coefficients excluded at best lambda
         zero_coefs = np.sum(logreg.coef_ == 0)
-
+        
         # Difference in accuracy
-        benchmarked_best = acc_data["Logistic Regression"]
+        benchmarked_best = acc_data.loc["Logistic Regression"]
         logreg_acc = logreg.score(small_X_test, v[3])
 
         benchmark += [[k, logreg, np.round(1/lambda_min, 3), np.round(1/lambda_1se, 3),

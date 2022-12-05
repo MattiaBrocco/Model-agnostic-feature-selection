@@ -104,7 +104,9 @@ def sorted_importance_index(model, X, y, features):
         arr = np.c_[features, abs_avg_shaps]
     else:
         imps = permutation_importance(model, X, y, scoring = "accuracy",
-                                     random_state = 42, n_repeats = 30)
+                                      random_state = 42, n_repeats = 30,
+                                      max_samples = min(len(X), 1000),
+                                      n_jobs = -1)
 
         arr = np.c_[features, imps["importances_mean"]]
 
@@ -142,7 +144,7 @@ def build_MLP(X_train, y_train_cat, features):
                     activation = "relu"))
     model.add(Dense(units = 10, activation = "relu"))
     model.add(Dense(units = 2, activation = "sigmoid"))
-    model.compile(loss = "binary_crossentropy", optimizer = "sgd",
+    model.compile(loss = "binary_crossentropy", optimizer = "adam",
                   metrics = ["accuracy"])
     
     if isinstance(X_train, pd.DataFrame):
