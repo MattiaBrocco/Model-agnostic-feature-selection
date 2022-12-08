@@ -134,12 +134,14 @@ def build_MLP(X_train, y_train_cat, features):
     features : 'dict'. output of 'variable_selection'
     """
     
+    sel_features = features["Features"] if isinstance(features, dict) else features
+    
     set_random_seed(101)    
     early_stopping = EarlyStopping(monitor = "val_loss", mode = "min",
                                    patience = 5, verbose = 0)
 
     model = Sequential(name = "ANN")
-    model.add(Dense(input_dim = len(features["Features"]),
+    model.add(Dense(input_dim = len(sel_features),
                     units = int(X_train.shape[1])/2,
                     activation = "relu"))
     model.add(Dense(units = 10, activation = "relu"))
@@ -148,9 +150,9 @@ def build_MLP(X_train, y_train_cat, features):
                   metrics = ["accuracy"])
     
     if isinstance(X_train, pd.DataFrame):
-        small_X_train = X_train.iloc[:, features["Features"]]
+        small_X_train = X_train.iloc[:, sel_features]
     else:
-        small_X_train = X_train[:, features["Features"]]
+        small_X_train = X_train[:, sel_features]
     
     history = model.fit(small_X_train, y_train_cat,
                         epochs = 500, batch_size = min(len(X_train)/3, 50),
@@ -199,3 +201,29 @@ def data_to_feather(data_dir):
     df.to_feather("{}\\{}.feather".format("\\".join(data_dir.split("\\")[:-1]), filename))
     
     return None
+
+
+"""
+APPENDIX
+
+MERGE OF DATASETS FOR **R_NEO_PI**
+```python
+a = pd.read_excel(data_dir + "\\R_NEO_PI_Faked.xlsx")
+b = pd.read_excel(data_dir + "\\R_NEO_PI_Honest.xlsx")
+
+a.columns = [" ".join([pd.Series(a.columns).apply(lambda s: np.nan if "Unnamed"
+                                                  in s else s).fillna(method = "ffill").tolist()[i],
+                       a.loc[0][i]]) for i in range(len(a.columns))]
+b.columns = [" ".join([pd.Series(b.columns).apply(lambda s: np.nan if "Unnamed"
+                                                  in s else s).fillna(method = "ffill").tolist()[i],
+                       b.loc[0][i]]) for i in range(len(b.columns))]
+
+a = a.drop(0).reset_index(drop = True)
+b = b.drop(0).reset_index(drop = True)
+
+a["CONDITION"] = "FAKE"
+b["CONDITION"] = "HONEST"
+
+pd.concat([a, b], ignore_index = True).to_excel(data_dir + "\\R_NEO_PI.xlsx", index = False)
+```
+"""

@@ -5,7 +5,14 @@ import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
 
+from sklearn.svm import LinearSVC
+from sklearn.metrics import accuracy_score
+from tensorflow.keras.utils import to_categorical
+from sklearn.linear_model import LogisticRegression
 from sklearn.linear_model import LogisticRegressionCV
+from sklearn.ensemble import GradientBoostingClassifier
+
+import support
 
 
 def stability_metric(df):
@@ -107,6 +114,122 @@ def graphical_lasso_benchmark(benchmark):
     lasso_ax[1].legend()
     
     plt.show()
+    
+    
+def just_benchmarking(X_train, X_test, y_train, y_test):
+    
+    # Logistic regression
+    model1 = LogisticRegression(random_state = 42, n_jobs = -1,
+                                max_iter = 5e3, solver = "saga")
+    model1.fit(X_train, y_train)
+
+    # Support vector machine
+    model2 = LinearSVC(random_state = 42, max_iter = 1e4)
+    model2.fit(X_train, y_train)
+
+    # Random forest
+    model3 = GradientBoostingClassifier(random_state = 42,
+                                        min_samples_leaf = np.max([5,
+                                                                   len(X_train)/100]).astype(int))
+    model3.fit(X_train, y_train)
+
+    # Neural network
+    y_train_cat = to_categorical(y_train, 2)
+    y_test_cat = to_categorical(y_test, 2)
+
+    model4 = support.build_MLP(X_train, y_train_cat,
+                               {"Features":list(range(X_train.shape[1]))})
+
+
+    # SCORES
+    out = np.c_[[accuracy_score(y_test, model1.predict(X_test)),
+                 accuracy_score(y_test, model2.predict(X_test)),
+                 accuracy_score(y_test, model3.predict(X_test)),
+                 accuracy_score(y_test, pd.DataFrame(model4.predict(X_test))\
+                                        .idxmax(axis = 1).values )]]
+    
+    return out
+    
+
+def summary_table(data_dict, stability = True, neural_net = True):
+    """
+    Parameters
+    ----------
+    
+    data_dict : {"dataset_name": [X_train,              --> pd.DataFrame / np.ndarray
+                                  X_test,               --> pd.DataFrame / np.ndarray
+                                  y_train,              --> pd.DataFrame / np.ndarray
+                                  y_test,               --> pd.DataFrame / np.ndarray
+                                  selected_variables,   --> iterable (list, np.array, ...) / dict
+                                  accuracies,           --> iterable (list, np.array, ...)
+                                  stability             --> iterable (list, np.array, ...)
+                                  ]
+                }
+    
+    stability : bool
+    """
+    summary = []
+    for k, v in data_dict.items():
+
+        # Dataset name
+        # Sample size
+        # Training size
+        # Initial number of features
+        # Selected features
+        # Stability
+        # ACCURACY: Full Logit
+        # ACCURACY: Logistic Regression
+        # ACCURACY: SVC
+        # ACCURACY: Random Forest
+        # ACCURACY: Neural Network
+        # Average accuracy (full logit excluded)
+        # Accuracy Standard deviation (full logit excluded)
+        # Decreased accuracy (mean) w.r.t. full logit
+        
+        
+        sel_features = v[4]["Features"] if isinstance(v[4], dict) else v[4]
+        
+        if stability == True:
+            summary += [[k, len(v[2]) + len(v[3]), len(v[2]),
+                         v[0].shape[1], len(sel_features),
+                         v[6], *v[5]["Accuracy"].tolist(),
+                         v[5]["Accuracy"][1:].mean(),
+                         v[5]["Accuracy"][1:].std(),
+                         v[5]["Accuracy"][1:].mean() - v[5]["Accuracy"].tolist()[0]]]
+
+        else:
+            summary += [[k, len(v[2]) + len(v[3]), len(v[2]),
+                         v[0].shape[1], len(sel_features),
+                         *v[5]["Accuracy"].tolist(),
+                         v[5]["Accuracy"][1:].mean(),
+                         v[5]["Accuracy"][1:].std(),
+                         v[5]["Accuracy"][1:].mean() - v[5]["Accuracy"].tolist()[0]]]
+            
+    
+    if stability == False:
+        summ_columns = ["Dataset name", "Sample size", "Training size", "Number of Features",
+                        "Selected Features", "Accuracy - Logit all features",
+                        "Accuracy - Logit", "Accuracy - SVM", "Accuracy - RF",
+                        "Accuracy - MLP", "Avg Acc. on selected features",
+                        "Accuracy Std on selected features", "Acc. diff. wrt Full logit"]
+        if neural_net == False:
+            summ_columns = ["Dataset name", "Sample size", "Training size", "Number of Features",
+                            "Selected Features", "Accuracy - Logit all features",
+                            "Accuracy - Logit", "Accuracy - SVM", "Accuracy - RF",
+                            "Avg Acc. on selected features",
+                            "Accuracy Std on selected features", "Acc. diff. wrt Full logit"]
+    else:
+        summ_columns = ["Dataset name", "Sample size", "Training size", "Number of Features",
+                        "Selected Features", "Feat. Top5-Stability", "Accuracy - Logit all features",
+                        "Accuracy - Logit", "Accuracy - SVM", "Accuracy - RF",
+                        "Accuracy - MLP", "Avg Acc. on selected features",
+                        "Accuracy Std on selected features", "Acc. diff. wrt Full logit"]
+    
+    summary = pd.DataFrame(summary, columns = summ_columns)
+
+    return summary.applymap(lambda v: v if isinstance(v, str) else round(v, 3))
+    
+    
     
     
     

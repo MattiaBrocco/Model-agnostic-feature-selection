@@ -3,7 +3,7 @@ import sys
 import numpy as np
 import pandas as pd
 import scipy.stats as stats
-from sklearn.svm import SVC
+from sklearn.svm import LinearSVC
 from sklearn.metrics import accuracy_score
 from sklearn.preprocessing import StandardScaler
 from sklearn.tree import DecisionTreeClassifier
@@ -11,6 +11,7 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.model_selection import train_test_split
 from sklearn.inspection import permutation_importance
 from sklearn.ensemble import GradientBoostingClassifier
+from sklearn.feature_selection import mutual_info_classif
 
 from tensorflow.keras.utils import to_categorical
 
@@ -175,15 +176,18 @@ class Classification:
         self.y_train = y_train
         self.features = features
         
+        sel_features = features["Features"] if isinstance(features, dict) else features
+        
+        
         if isinstance(X_train, pd.DataFrame):
-            small_X_train = X_train.iloc[:, features["Features"]]
+            small_X_train = X_train.iloc[:, sel_features]
         else:
-            small_X_train = X_train[:, features["Features"]]
+            small_X_train = X_train[:, sel_features]
             
         if isinstance(X_test, pd.DataFrame):
-            small_X_test = X_test.iloc[:, features["Features"]]
+            small_X_test = X_test.iloc[:, sel_features]
         else:
-            small_X_test = X_test[:, features["Features"]]
+            small_X_test = X_test[:, sel_features]
         
         # Full Logit
         model0 = LogisticRegression(random_state = 42, n_jobs = -1,
@@ -195,7 +199,7 @@ class Classification:
         model1.fit(small_X_train, y_train)
         
         # Support vector machine
-        model2 = SVC(random_state = 42)
+        model2 = LinearSVC(random_state = 42, max_iter = 1e4)
         model2.fit(small_X_train, y_train)
         
         # Random forest
@@ -223,9 +227,9 @@ class Classification:
         #                                                             features["Features"]))(model)
         #                     for model in [model1, model2, model3, model4])
         
-        importance_rank = [[np.nan]*len(features["Features"][:5])] +\
+        importance_rank = [[np.nan]*len(sel_features[:5])] +\
                           [support.sorted_importance_index(m, small_X_train, y_train,
-                                                           features["Features"])
+                                                           sel_features)
                            for m in [model1, model2, model3, model4]]
         
         # SCORES
@@ -266,6 +270,24 @@ class Classification:
         
         return out, stability
         
+
+    def mutual_info(self, X_data, y_data):
+        self.X_data = X_data
+        self.y_data = y_data
+        
+        np.random.seed(42)
+        ms_ = []
+        for rs in np.random.randint(1, 100, (10, )):
+            ms_ += [mutual_info_classif(X_data, y_data, random_state = rs)]
+
+        ms_ = np.array(ms_).mean(axis = 0)
+
+        # Variable selection
+        # 75% percentile
+        perc75_variables = np.arange(len(ms_))[ms_ > np.quantile(ms_, 0.75)]
+
+        return perc75_variables
+
         
         
         
