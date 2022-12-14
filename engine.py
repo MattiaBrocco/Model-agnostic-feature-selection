@@ -2,6 +2,7 @@ import os
 import sys
 import numpy as np
 import pandas as pd
+from rpy2 import robjects
 import scipy.stats as stats
 from sklearn.svm import LinearSVC
 from sklearn.metrics import accuracy_score
@@ -271,15 +272,17 @@ class Classification:
         return out, stability
         
 
-    def mutual_info(self, X_data, y_data):
+    def mutual_info(self, X_data, y_data, r_environ = None):
         self.X_data = X_data
         self.y_data = y_data
-
-        from rpy2 import robjects
+        self.r_environ = r_environ
 
         np.savetxt("X.csv", X_data, delimiter=",")
         np.savetxt("y.csv", y_data, delimiter=",", fmt='%s')
-
+        
+        if r_environ is not None:
+            os.environ["R_HOME"] = r_environ
+            
         robjects.r("""
         library(praznik)
         X <- read.csv("X.csv",header = FALSE)
@@ -296,13 +299,7 @@ class Classification:
 
         best_features = [int(x) for x in robjects.globalenv['best_features']]
 
-        return best_features
+        os.remove("X.csv")
+        os.remove("y.csv")
 
-
-
-        
-        
-        
-        
-        
-        
+        return np.array(best_features)

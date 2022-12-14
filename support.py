@@ -62,6 +62,7 @@ def likelihood_ratio_test(model_red, model_full, X_train_red, X_train_full, y_tr
     return lambda_stat, p_value
     
     
+
 def D3_pruning(X_train, y_train):
     
     tree = DecisionTreeClassifier(random_state = 42, criterion = "entropy")
