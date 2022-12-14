@@ -282,8 +282,8 @@ class Classification:
 
         robjects.r("""
         library(praznik)
-        X <- read.csv("C:/Users/Asus/Desktop/cognitive_datasets/X.csv",header = FALSE)
-        y <- read.csv("C:/Users/Asus/Desktop/cognitive_datasets/y.csv",header = FALSE)
+        X <- read.csv("X.csv",header = FALSE)
+        y <- read.csv("y.csv",header = FALSE)
         y <- as.factor(as.vector(y[,1]))
         a <- JMIM(X,y,dim(X)[2])
         sorted_scores <- sort(a$score,decreasing = TRUE)
