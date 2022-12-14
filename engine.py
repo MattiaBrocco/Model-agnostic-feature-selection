@@ -274,19 +274,31 @@ class Classification:
     def mutual_info(self, X_data, y_data):
         self.X_data = X_data
         self.y_data = y_data
-        
-        np.random.seed(42)
-        ms_ = []
-        for rs in np.random.randint(1, 100, (10, )):
-            ms_ += [mutual_info_classif(X_data, y_data, random_state = rs)]
 
-        ms_ = np.array(ms_).mean(axis = 0)
+        from rpy2 import robjects
 
-        # Variable selection
-        # 75% percentile
-        perc75_variables = np.arange(len(ms_))[ms_ > np.quantile(ms_, 0.75)]
+        np.savetxt("X.csv", X_data, delimiter=",")
+        np.savetxt("y.csv", y_data, delimiter=",", fmt='%s')
 
-        return perc75_variables
+        robjects.r("""
+        library(praznik)
+        X <- read.csv("C:/Users/Asus/Desktop/cognitive_datasets/X.csv",header = FALSE)
+        y <- read.csv("C:/Users/Asus/Desktop/cognitive_datasets/y.csv",header = FALSE)
+        y <- as.factor(as.vector(y[,1]))
+        a <- JMIM(X,y,dim(X)[2])
+        sorted_scores <- sort(a$score,decreasing = TRUE)
+        sorted_scores_max <- max(sorted_scores)
+        sorted_scores_new <- sorted_scores/sorted_scores_max
+        best_features = a$selection[names(sorted_scores_new[sorted_scores_new > 0.80])]
+        best_features = best_features - 1 
+        best_features
+        """)
+
+        best_features = [int(x) for x in robjects.globalenv['best_features']]
+
+        return best_features
+
+
 
         
         
