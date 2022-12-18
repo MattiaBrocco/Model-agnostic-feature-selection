@@ -55,7 +55,7 @@ def scree_plot(data):
     scaler = StandardScaler()
     X = scaler.fit_transform(X)
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42)
-    pca = PCA(0.70)
+    pca = PCA(0.90)
     X_train_pca = pca.fit_transform(X_train)
     X_test_pca = pca.transform(X_test)
     
@@ -78,17 +78,35 @@ def pca_ds_acc(data):
         
     X = data.iloc[:,:-1]
     y = data.iloc[:,-1]
+    
     scaler = StandardScaler()
     X = scaler.fit_transform(X)
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42)
-    pca = PCA(0.70)
+    pca = PCA(0.90, random_state = 42)
     X_train_pca = pca.fit_transform(X_train)
     X_test_pca = pca.transform(X_test)
-
+    n, p = data.shape
+    perc = round(p/100*20)
     n_pcs= pca.components_.shape[0]
+    
+    prop = list((pca.explained_variance_ratio_)/np.sum(pca.explained_variance_ratio_))
+    edp = []
+    count = 0
+    for r in range(n_pcs):
+        if count < perc:
+            epc = round(perc*prop[r])
+            if epc == 0 :
+                edp.append(perc-count)
+                count = perc
+            else:
+                edp.append(epc)
+                count += epc
+        else:
+            edp.append(0)
+
     pca_comp = [abs(pca.components_[x]) for x in range(n_pcs)]
     pca_comp = [list(pca_comp[l]) for l in range(n_pcs)]
-    pca_comp_sort = [sorted(pca_comp[p])[-3:] for p in range(n_pcs)]
+    pca_comp_sort = [sorted(pca_comp[k],reverse=True)[:edp[k]] for k in range(n_pcs)]
 
     most_important_index = []
     for k in range(len(pca_comp_sort)):
