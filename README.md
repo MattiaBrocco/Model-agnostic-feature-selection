@@ -1,3 +1,4 @@
 # CBSD-2022-UNIPD
 GOAL: structure a proposal that is robust across all the datasets
-![image](https://user-images.githubusercontent.com/61026948/206588473-9e6d334a-ee1c-4046-8adc-e9d2fd7dfc6e.png)
+![Overall_comparison](https://user-images.githubusercontent.com/61026948/208322590-7ce7f08b-a8c2-4d6d-9a08-db102a85cbd3.jpg)
+
