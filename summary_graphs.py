@@ -18,7 +18,8 @@ def accuracy_barplot(data, prefix, save = False):
             height = data.sort_values("Avg Acc. on selected features",
                                       ascending = False)["Avg Acc. on selected features"],
             yerr = data.sort_values("Avg Acc. on selected features",
-                                    ascending = False)["Accuracy Std on selected features"], alpha = .7)
+                                    ascending = False)["Accuracy Std on selected features"],
+            alpha = .7, color = "#814DFF")
     plt.xticks(rotation = 35, fontsize = 13)
     plt.yticks(fontsize = 12)
     plt.ylabel("Accuracy\n(mean ± std)", fontsize = 13, rotation = 0, labelpad = 50)
@@ -43,7 +44,8 @@ def accuracy_std(data, prefix, save = False):
     plt.bar(x = data.sort_values("Accuracy Std on selected features",
                                  ascending = False)["Dataset name"],
             height = data.sort_values("Accuracy Std on selected features",
-                                      ascending = False)["Accuracy Std on selected features"], alpha = .7)
+                                      ascending = False)["Accuracy Std on selected features"],
+            alpha = .7, color = "#814DFF")
     plt.xticks(rotation = 35, fontsize = 13)
     plt.yticks(fontsize = 12)
     plt.ylabel("Stand. Dev.", fontsize = 13, rotation = 0, labelpad = 30)
@@ -82,13 +84,17 @@ def faking_type_comparison(data, prefix, save = False):
         
     
         data_use[data_use["Faking Type"] == ftp].sort_values("Accuracy - Logit all features",
-                                                             ascending = False).plot(x = "Dataset name",
-                                                                                     y = ["Accuracy - Logit all features",
-                                                                                          "Accuracy - Logit",
-                                                                                          "Accuracy - SVM", "Accuracy - RF",
-                                                                                          "Accuracy - MLP"],
-                                                                                     kind = "bar", rot = 0,
-                                                                                     ax = axft[n], title = ftp)
+                                                             ascending = False)\
+                                                .plot(x = "Dataset name",
+                                                      y = ["Accuracy - Logit all features",
+                                                           "Accuracy - Logit",
+                                                           "Accuracy - SVM", "Accuracy - RF",
+                                                           "Accuracy - MLP"],
+                                                      kind = "bar", rot = 0,
+                                                      ax = axft[n], title = ftp,
+                                                      color = ["#2F42FE", "#7A5EEF", "#BD78C9",
+                                                               "#E88790", "#FE9031"])
+        
         axft[n].axhline(data_use[data_use["Faking Type"] == ftp]\
                         ["Avg Acc. on selected features"].mean(), ls = "--", color = "grey")
     
