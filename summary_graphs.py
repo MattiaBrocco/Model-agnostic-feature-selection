@@ -48,7 +48,7 @@ def accuracy_std(data, prefix, save = False):
             alpha = .7, color = "#814DFF")
     plt.xticks(rotation = 35, fontsize = 13)
     plt.yticks(fontsize = 12)
-    plt.ylabel("Stand. Dev.", fontsize = 13, rotation = 0, labelpad = 30)
+    plt.ylabel("Stand. Dev.", fontsize = 13, rotation = 0, labelpad = 40)
     plt.title("Standard Deviation of Accuracies on different datasets", fontsize = 18)
     if save == True:
         plt.savefig(f".\\images\\{prefix}_accuracy_std.jpg", dpi = 300)

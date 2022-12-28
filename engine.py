@@ -2,6 +2,7 @@ import os
 import sys
 import numpy as np
 import pandas as pd
+import lightgbm as lgb
 from rpy2 import robjects
 import scipy.stats as stats
 from sklearn.svm import LinearSVC
@@ -110,12 +111,18 @@ class Classification:
         # 1.1 Pruning        
         pruned_tree = support.D3_pruning(X_train_no_val, y_train_no_val)
         # !!!!!!
-        random_forest = GradientBoostingClassifier(random_state = 42,
-                                                   ccp_alpha = pruned_tree.best_params_["ccp_alpha"])
+        #random_forest = GradientBoostingClassifier(random_state = 42,
+        #                                           ccp_alpha = pruned_tree.best_params_["ccp_alpha"])
+        # !!!!!!
+        random_forest = lgb.LGBMClassifier(boosting_type = "rf",
+                                           bagging_freq = 10, bagging_fraction = 0.2,
+                                           max_depth = pruned_tree.best_estimator_.max_depth,
+                                           n_estimators = 200, random_state = 42,
+                                           n_jobs = -1, verbosity = -1)
+        
         random_forest.fit(X_train_no_val, y_train_no_val)
         
         # 1.3 Feature selection
-        
         perm_imp = permutation_importance(random_forest, X_val, y_val, n_repeats = 100,
                                           random_state = 42, scoring = "accuracy",
                                           n_jobs = -1)
@@ -151,7 +158,7 @@ class Classification:
         fl = np.abs(data_fl)[len(selected_features)].min()
         
         # validation_test[1]: p-value of likelihood ratio test
-        # If p_value > 0, the nested model should be used
+        # If p_value > 0.05, the nested model should be used
         valid_lrt = True if validation_test[1] > 0.05 else False
         # Correlations
         valid_corr = True if fl >= 0.7 else False

@@ -40,19 +40,24 @@ def lasso_benchmark(diz):
     benchmark = []
     for k, v in diz.items():
         
-        sel_feats = [i for i in v if isinstance(i, dict)][0]
+        sel_feats = [i for i in v if isinstance(i, dict)]
+        if len(sel_feats) == 0:
+            sel_feats = v[4]
+        else:
+            sel_feats = sel_feats[0]["Features"]
+        
         acc_data = [i for i in v if isinstance(i, pd.DataFrame)
                     and "Accuracy" in i.columns][0]
         
         if isinstance(v[0], pd.DataFrame):
-            small_X_train = v[0].iloc[:, sel_feats["Features"]]
+            small_X_train = v[0].iloc[:, sel_feats]
         else:
-            small_X_train = v[0][:, sel_feats["Features"]]
+            small_X_train = v[0][:, sel_feats]
             
         if isinstance(v[1], pd.DataFrame):
-            small_X_test = v[1].iloc[:, sel_feats["Features"]]
+            small_X_test = v[1].iloc[:, sel_feats]
         else:
-            small_X_test = v[1][:, sel_feats["Features"]]
+            small_X_test = v[1][:, sel_feats]
         
         logreg = LogisticRegressionCV(Cs = 1/np.linspace(.1, 100, 300),
                                       penalty = "l1", n_jobs = -1,
@@ -80,7 +85,16 @@ def lasso_benchmark(diz):
 
         benchmark += [[k, logreg, np.round(1/lambda_min, 3), np.round(1/lambda_1se, 3),
                        zero_coefs, np.round(logreg_acc-benchmarked_best, 3)]]
-    return benchmark
+    
+    benchmark_df = pd.DataFrame(benchmark,
+                                columns = ["Dataset", "Algo", "λ min", "λ 1se",
+                                           "Zero coeffs at λ min",
+                                           "Delta accuracy"]).drop("Algo", axis = 1)
+
+    benchmark_df["Delta accuracy"] = benchmark_df["Delta accuracy"]\
+                                     .apply(lambda s: s.loc["Accuracy"])
+    
+    return benchmark_df
 
 
 def graphical_lasso_benchmark(benchmark):

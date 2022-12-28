@@ -8,6 +8,7 @@ from sklearn.tree import DecisionTreeClassifier
 from sklearn.model_selection import GridSearchCV
 from sklearn.inspection import permutation_importance
 from sklearn.linear_model import LogisticRegressionCV
+from sklearn.ensemble import GradientBoostingClassifier
 
 from tensorflow.keras.layers import Dense
 from tensorflow.keras.layers import Input
@@ -78,7 +79,7 @@ def D3_pruning(X_train, y_train):
                                                          np.round(impurities.max()/2, 3),
                                                          num = 10)]}
 
-    tree_grid = GridSearchCV(DecisionTreeClassifier(random_state = 42, criterion = "entropy"),
+    tree_grid = GridSearchCV(GradientBoostingClassifier(random_state = 42),
                              tree_params, cv = 3, n_jobs = -1, verbose = 0,
                              return_train_score = True)
     tree_grid.fit(X_train, y_train)
