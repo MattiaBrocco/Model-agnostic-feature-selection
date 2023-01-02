@@ -34,45 +34,6 @@ def prepare_data(data_dir, target):
     return data_import
 
 
-def new_mwu_data(data):
-    n, p = data.shape
-    X_honest = data[data["CONDITION"] == 1].iloc[:, :-1]
-    X_dishonest = data[data["CONDITION"] == 0].iloc[:, :-1]
-    indices = []
-    for k in range(0, (p-1)):
-        U1, s = mannwhitneyu(X_honest.iloc[:, k],
-                             X_dishonest.iloc[:, k])
-        if s < 0.01:
-            indices.append(k)
-    indices.append(-1)
-    
-    return data.iloc[:, indices]
-
-
-def scree_plot(data):
-    X = data.iloc[:,:-1]
-    y = data.iloc[:,-1]
-    scaler = StandardScaler()
-    X = scaler.fit_transform(X)
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42)
-    pca = PCA(0.90)
-    X_train_pca = pca.fit_transform(X_train)
-    X_test_pca = pca.transform(X_test)
-    
-    print(pca.explained_variance_ratio_)
-    plt.bar(range(1,len(pca.explained_variance_)+1),
-            pca.explained_variance_ )
- 
-    plt.plot(range(1,len(pca.explained_variance_ )+1),
-             np.cumsum(pca.explained_variance_), c='red',
-             label='Cumulative Explained Variance')
- 
-    plt.legend(loc='upper left')
-    plt.xlabel('Number of components')
-    plt.ylabel('Explained variance (eignenvalues)')
-    plt.title('Scree plot')
- 
-    plt.show()
     
 def pca_ds_acc(data):
         
