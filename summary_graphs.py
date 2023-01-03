@@ -102,4 +102,78 @@ def faking_type_comparison(data, prefix, save = False):
         plt.savefig(f".\\images\\{prefix}faking_type_comparison.jpg", dpi = 300)
     else:
         plt.show()
+        
+        
+def approaches_comparison(summary1, summary2, summary3, save = False):
     
+    
+    summ1 = summary1.copy()
+    summ1.columns = [f"{c}_pca" if c != "Dataset name" else c
+                     for c in summ1.columns]
+    summ2 = summary2.copy()
+    summ2.columns = [f"{c}_permimp" if c != "Dataset name" else c
+                     for c in summ2.columns]
+    summ3 = summary3.copy()
+    summ3.columns = [f"{c}_mutinfo" if c != "Dataset name" else c
+                     for c in summ3.columns]
+    
+    summary_merge = summ1.merge(summ2, on = "Dataset name",
+                                how = "inner").merge(summ3, on = "Dataset name",
+                                                     how = "inner")
+
+    xax_labels = summary_merge["Dataset name"].str.replace("_", " ")\
+                 .str.replace("df", "").str.replace("  ", " ")
+
+    fig, ax = plt.subplots(4, 1, figsize = (14, 18))
+    summary_merge.rename(columns = {"Avg Acc. on selected features_pca": "PCA",
+                                    "Avg Acc. on selected features_mutinfo": "Mutual info.",
+                                    "Avg Acc. on selected features_permimp": "Perm. Import."})\
+                 .plot(x = "Dataset name", y = ["PCA", "Perm. Import.", "Mutual info."],
+                       kind = "bar", rot = 0, ax = ax[0],#, 0],
+                       title = "Avg Acc. on selected features",
+                       color = ["#243FFF", "#BD78C9", "#FE9031"])
+
+    summary_merge.rename(columns = {"Acc. diff. wrt Full logit_pca": "PCA",
+                                    "Acc. diff. wrt Full logit_mutinfo": "Mutual info.",
+                                    "Acc. diff. wrt Full logit_permimp": "Perm. Import."})\
+                 .sort_values("Perm. Import.", ignore_index = True)\
+                 .plot(x = "Dataset name", y = ["PCA", "Perm. Import.", "Mutual info."],
+                       kind = "bar", rot = 0, ax = ax[1],#, 0],
+                       title = "Acc. diff. wrt Full logit",
+                       color = ["#243FFF", "#BD78C9", "#FE9031"]) # PREV. PALETTE: ["#243FFF", "#FF9022", "#FF1F85"]
+
+    summary_merge.rename(columns = {"Accuracy Std on selected features_pca": "PCA",
+                                    "Accuracy Std on selected features_mutinfo": "Mutual info.",
+                                    "Accuracy Std on selected features_permimp": "Perm. Import."})\
+                 .plot(x = "Dataset name", y = ["PCA", "Perm. Import.", "Mutual info."],
+                       kind = "bar", rot = 0, ax = ax[2],#, 0],
+                       title = "Accuracy Std on selected features",
+                       color = ["#243FFF", "#BD78C9", "#FE9031"])
+
+    summary_merge.rename(columns = {"Feat. Top5-Stability_pca": "PCA",
+                                    "Feat. Top5-Stability_mutinfo": "Mutual info.",
+                                    "Feat. Top5-Stability_permimp": "Perm. Import."})\
+                 .plot(x = "Dataset name", y = ["PCA", "Perm. Import.", "Mutual info."],
+                       kind = "bar", rot = 0, ax = ax[3],#, 0],
+                       title = "Feat. Top5-Stability",
+                       color = ["#243FFF", "#BD78C9", "#FE9031"])
+
+    # 5 colors palette: https://coolors.co/2f42fe-7a5eef-bd78c9-e88790-fe9031
+    # --> ["#2f42fe", "#7a5eef", "#bd78c9", "#e88790", "#fe9031"]
+
+    ax[0].set_xticklabels(xax_labels, rotation = 42)
+    ax[1].set_xticklabels(xax_labels, rotation = 42)
+    ax[2].set_xticklabels(xax_labels, rotation = 42)
+    ax[3].set_xticklabels(xax_labels, rotation = 42)
+
+    ax[0].set(xlabel = None)
+    ax[1].set(xlabel = None)
+    ax[2].set(xlabel = None)
+    ax[3].set(xlabel = None)
+
+    plt.tight_layout()
+
+    if save == True:
+        plt.savefig(f".\\images\\Overall_comparison.jpg", dpi = 300)
+    else:
+        plt.show()
