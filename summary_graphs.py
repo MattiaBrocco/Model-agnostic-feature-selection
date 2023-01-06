@@ -177,3 +177,27 @@ def approaches_comparison(summary1, summary2, summary3, save = False):
         plt.savefig(f".\\images\\Overall_comparison.jpg", dpi = 300)
     else:
         plt.show()
+        
+        
+def final_table(col, summary1, summary2, summary3):
+    
+    summary_merge = summary1.rename(columns = dict(zip(summary1.columns,
+                                                       [f"{c}_pca" if c != "Dataset name" else c
+                                                        for c in summary1.columns])))\
+                    .merge(summary2.rename(columns = dict(zip(summary2,
+                                                              [f"{c}_permimp" if c != "Dataset name" else c
+                                                               for c in summary2.columns]))),
+                           on = "Dataset name", how = "inner")\
+                    .merge(summary3.rename(columns = dict(zip(summary3.columns,
+                                                              [f"{c}_mutinfo" if c != "Dataset name" else c
+                                                               for c in summary3.columns]))),
+                           on = "Dataset name", how = "inner")
+    
+    
+    out = summary_merge[[f"{col}_pca", f"{col}_permimp",
+                         f"{col}_mutinfo"]].describe().loc[["mean", "min", "max"]]
+    
+    out = out.rename(columns = {f"{col}_pca": "PCA", f"{col}_permimp": "PERM. IMP.",
+                                f"{col}_mutinfo": "JMIM"})
+    print(col)
+    return out.applymap(lambda v:round(v, 4))
