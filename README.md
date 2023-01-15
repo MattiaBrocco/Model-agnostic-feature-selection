@@ -32,15 +32,9 @@ A logistic regression with all the features is trained at the beginning. In this
     $TOP5 Stability=1-\big(\frac{1}{(\# models-1)*\min{(5,|\Omega|)}} \sum^{\min{(5,|\Omega|)}}_{i=1}{|\beta_{i}|-1}\big)$
 </center>
 where $\Omega$ is the set of features selected by a procedure, i.e. $\Omega=\{\beta_1,...,\beta_n\}$; $\beta_i$ is a vector with the feature selected with importance $i$ across the models (notice that in our case $\# models=4$). Finally, $|\beta_i|$ is the number of unique values in $\beta_i$.</p>
+
 ### Datasets
-<style type="text/css">
-.tg  {border-collapse:collapse;border-spacing:0;}
-.tg td{border-color:black;border-style:solid;border-width:1px;font-family:Arial, sans-serif;font-size:14px;
-  overflow:hidden;padding:10px 5px;word-break:normal;}
-.tg th{border-color:black;border-style:solid;border-width:1px;font-family:Arial, sans-serif;font-size:14px;
-  font-weight:normal;overflow:hidden;padding:10px 5px;word-break:normal;}
-.tg .tg-0pky{border-color:inherit;text-align:left;vertical-align:top}
-</style>
+
 <table class="tg">
 <thead>
   <tr>
